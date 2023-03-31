@@ -43,7 +43,7 @@ namespace CartMicroservice.Controllers
                 client.BaseAddress = new Uri(domin);
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                var response = client.PostAsJsonAsync("/api/rest/v1/productdetails/cartitems", ProductIdList).Result;
+                var response = client.PostAsJsonAsync("/api/rest/v1/cartitems", ProductIdList).Result;
 
 
 
