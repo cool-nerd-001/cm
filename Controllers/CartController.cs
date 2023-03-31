@@ -31,7 +31,7 @@ namespace CartMicroservice.Controllers
 
             if (!records.Any())
             {
-                return Ok(new {array = records});
+                return Ok(new {items = records});
             }
 
 
@@ -60,7 +60,7 @@ namespace CartMicroservice.Controllers
                         i.cartId = temp.CartId;
                     }
 
-                    return Ok(CartItems);
+                    return Ok(new { items = CartItems });
 
 
                 }
@@ -68,7 +68,7 @@ namespace CartMicroservice.Controllers
             }
 
 
-            return Ok(new {array = records});
+            return Ok(new {items = records});
         }
 
         [HttpPost("add")]
