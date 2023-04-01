@@ -163,6 +163,33 @@ namespace CartMicroservice.Controllers
             return Ok();
         }
 
+        [HttpDelete("reduce/{cartId:guid}")]
+        public async Task<IActionResult> ReduceQuantity([FromRoute] Guid cartId)
+        {
+
+            var record = await _context.Cart.FindAsync(cartId);
+
+            if (record == null)
+            {
+                return NotFound();
+            }
+
+            if(record.Quantity == 1)
+            {
+                _context.Cart.Remove(record);
+                await _context.SaveChangesAsync();
+
+                return Ok();
+
+            }
+
+            record.Quantity = record.Quantity - 1;
+
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
+
 
 
     }
