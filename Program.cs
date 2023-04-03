@@ -15,6 +15,8 @@ builder.Services.AddDbContext<CartMicroserviceDbContext>(options => {
         builder.Configuration["ConnectionStrings:CartMicroserviceDatabase"]);
 });
 
+builder.Services.AddCors();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -25,6 +27,11 @@ var app = builder.Build();
 //}
 
 app.UseHttpsRedirection();
+
+app.UseCors(opt =>
+{
+    opt.AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithOrigins("http://localhost:3000");
+});
 
 app.UseAuthorization();
 

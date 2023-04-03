@@ -1,7 +1,10 @@
 ﻿using CartMicroservice.DbContexts;
 using CartMicroservice.Dto;
 using CartMicroservice.Models;
+using CartMicroservice.Utils;
 using Microsoft.AspNetCore.Mvc;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
@@ -14,7 +17,7 @@ namespace CartMicroservice.Controllers
     {
 
         private readonly CartMicroserviceDbContext _context;
-        private readonly IConfiguration _configuration;
+        public readonly IConfiguration _configuration;
 
         public CartController(CartMicroserviceDbContext context , IConfiguration configuration)
         {
@@ -24,9 +27,31 @@ namespace CartMicroservice.Controllers
         }
 
 
-        [HttpGet("items/{customerId:guid}")]
-        public async Task<IActionResult> GetItems([FromRoute] Guid customerId)
+
+
+        [HttpGet("items")]
+        public async Task<IActionResult> GetItems()
         {
+
+            // Retrieve the JWT token from the Authorization header
+            var authorizationHeader = Request.Headers["Authorization"].ToString();
+            var token = authorizationHeader.Replace("Bearer ", "");
+
+            Helper h = new Helper(_configuration);
+
+            var flag = await h.isAuthorised(token);
+
+            if (!flag)
+            {
+                return Unauthorized();
+            }
+
+            Guid customerId = h.getUserId(token);
+
+
+
+
+
             var records = _context.Cart.Where(x => x.CId ==customerId).Select(y => y.PId);
 
             if (!records.Any())
@@ -80,7 +105,25 @@ namespace CartMicroservice.Controllers
                 return BadRequest(ModelState);
             }
 
-            
+
+            // Retrieve the JWT token from the Authorization header
+            var authorizationHeader = Request.Headers["Authorization"].ToString();
+            var token = authorizationHeader.Replace("Bearer ", "");
+
+            Helper h = new Helper(_configuration);
+
+            var flag = await h.isAuthorised(token);
+
+            if (!flag)
+            {
+                return Unauthorized();
+            }
+
+            data.CId = h.getUserId(token);
+
+
+
+ 
             using (var client = new HttpClient())
             {
                 string? domin = _configuration["ProductMicroservice:domin"];
@@ -125,12 +168,25 @@ namespace CartMicroservice.Controllers
 
         }
 
-        [HttpDelete("clearAll/{customerId:guid}")]
-        public async Task<IActionResult> ClearCustomerCart([FromRoute] Guid customerId)
+        [HttpDelete("clearAll")]
+        public async Task<IActionResult> ClearCustomerCart()
         {
 
+            // Retrieve the JWT token from the Authorization header
+            var authorizationHeader = Request.Headers["Authorization"].ToString();
+            var token = authorizationHeader.Replace("Bearer ", "");
 
-      
+            Helper h = new Helper(_configuration);
+
+            var flag = await h.isAuthorised(token);
+
+            if (!flag)
+            {
+                return Unauthorized();
+            }
+
+            Guid customerId = h.getUserId(token);
+
             var record = _context.Cart.FirstOrDefault(x => x.CId == customerId);
 
             if (record == null)
@@ -150,6 +206,19 @@ namespace CartMicroservice.Controllers
         public async Task<IActionResult> DeleteCartItem([FromRoute] Guid cartId)
         {
 
+            // Retrieve the JWT token from the Authorization header
+            var authorizationHeader = Request.Headers["Authorization"].ToString();
+            var token = authorizationHeader.Replace("Bearer ", "");
+
+            Helper h = new Helper(_configuration);
+
+            var flag = await h.isAuthorised(token);
+
+            if (!flag)
+            {
+                return Unauthorized();
+            }
+
             var record = await _context.Cart.FindAsync(cartId);
 
             if (record == null)
@@ -166,6 +235,18 @@ namespace CartMicroservice.Controllers
         [HttpDelete("reduce/{cartId:guid}")]
         public async Task<IActionResult> ReduceQuantity([FromRoute] Guid cartId)
         {
+
+            var authorizationHeader = Request.Headers["Authorization"].ToString();
+            var token = authorizationHeader.Replace("Bearer ", "");
+
+            Helper h = new Helper(_configuration);
+
+            var flag = await h.isAuthorised(token);
+
+            if (!flag)
+            {
+                return Unauthorized();
+            }
 
             var record = await _context.Cart.FindAsync(cartId);
 
