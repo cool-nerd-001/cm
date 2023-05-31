@@ -1,11 +1,9 @@
 ﻿using CartMicroservice.DbContexts;
 using CartMicroservice.Dto;
 using CartMicroservice.Models;
-using CartMicroservice.Utils;
+using CartMicroservice.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http;
-using System.Net.Http.Headers;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 
@@ -17,13 +15,14 @@ namespace CartMicroservice.Controllers
     {
 
         private readonly CartMicroserviceDbContext _context;
-        public readonly IConfiguration _configuration;
+        public readonly IApiService _api;
 
-        public CartController(CartMicroserviceDbContext context , IConfiguration configuration)
+        public CartController(CartMicroserviceDbContext context , IApiService api)
         {
             _context = context;
-            _configuration = configuration ??
-                    throw new ArgumentNullException(nameof(configuration));
+
+            _api = api ??
+                    throw new ArgumentNullException(nameof(api));
         }
 
 
@@ -37,20 +36,15 @@ namespace CartMicroservice.Controllers
             var authorizationHeader = Request.Headers["Authorization"].ToString();
             var token = authorizationHeader.Replace("Bearer ", "");
 
-            Helper h = new Helper(_configuration);
+            HttpResponseMessage authresponse = await _api.isAuthorized(token);
 
-            var flag = await h.isAuthorised(token);
-
-            if (!flag)
+            if (!authresponse.IsSuccessStatusCode)
             {
                 return Unauthorized();
             }
 
-            Guid customerId = h.getUserId(token);
 
-
-
-
+            Guid customerId = _api.getUserId(token);
 
             var records = _context.Cart.Where(x => x.CId ==customerId).Select(y => y.PId);
 
@@ -60,40 +54,32 @@ namespace CartMicroservice.Controllers
             }
 
 
-            var ProductIdList = new { array = records};
+            var ProductIdList = await records.ToListAsync();
 
-            using (var client = new HttpClient())
+            HttpResponseMessage response = await _api.getProductDetails(ProductIdList);
+
+
+            if (response.IsSuccessStatusCode)
             {
-                string? domin = _configuration["ProductMicroservice:domin"];
-                client.BaseAddress = new Uri(domin);
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                var response = client.PostAsJsonAsync("/api/rest/v1/cartitems", ProductIdList).Result;
+
+            string content = await response.Content.ReadAsStringAsync();
+            List<GetCartItemsDto>? CartItems = JsonSerializer.Deserialize<List<GetCartItemsDto>>(content);
 
 
-
-                if (response.IsSuccessStatusCode)
-                {
-                    string content = await response.Content.ReadAsStringAsync();
-                    var CartItems = JsonSerializer.Deserialize<IList<GetCartItemsDto>>(content);
-
-
-                    foreach (var i in CartItems)
-                    {
-                        var temp = _context.Cart.FirstOrDefault(x => x.CId == customerId && x.PId == i.pId);
-                        i.quantity = temp.Quantity;
-                        i.cartId = temp.CartId;
-                    }
-
-                    return Ok(new { items = CartItems });
-
-
-                }
-    
+            foreach (var i in CartItems)
+            {
+                var temp = _context.Cart.FirstOrDefault(x => x.CId == customerId && x.PId == i.pId);
+                i.quantity = temp.Quantity;
+                i.cartId = temp.CartId;
             }
 
+            return Ok(new { items = CartItems });
 
-            return Ok(new {items = records});
+
+            }
+
+    
+            return StatusCode(503, "Product Service is currently unavailable"); 
         }
 
         [HttpPost("add")]
@@ -110,38 +96,26 @@ namespace CartMicroservice.Controllers
             var authorizationHeader = Request.Headers["Authorization"].ToString();
             var token = authorizationHeader.Replace("Bearer ", "");
 
-            Helper h = new Helper(_configuration);
+            HttpResponseMessage authresponse = await _api.isAuthorized(token);
 
-            var flag = await h.isAuthorised(token);
-
-            if (!flag)
+            if (!authresponse.IsSuccessStatusCode)
             {
                 return Unauthorized();
             }
 
-            data.CId = h.getUserId(token);
+            data.CId = _api.getUserId(token);
 
 
 
- 
-            using (var client = new HttpClient())
+            var response = await _api.isValidProduct(data.PId);
+
+            if (!response.IsSuccessStatusCode)
             {
-                string? domin = _configuration["ProductMicroservice:domin"];
-                client.BaseAddress = new Uri(domin);
-                client.DefaultRequestHeaders.Accept.Clear();
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-                HttpResponseMessage response = await client.GetAsync("/api/rest/v1/verify/" + data.PId);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return NotFound();
-
-                }
+                return NotFound();
 
             }
 
-
+        
             var record = _context.Cart.FirstOrDefault(x => x.CId == data.CId 
                                                       && x.PId == data.PId);
             if(record != null)
@@ -176,17 +150,15 @@ namespace CartMicroservice.Controllers
             var authorizationHeader = Request.Headers["Authorization"].ToString();
             var token = authorizationHeader.Replace("Bearer ", "");
 
-            Helper h = new Helper(_configuration);
+            HttpResponseMessage response = await _api.isAuthorized(token);
 
-            var flag = await h.isAuthorised(token);
-
-            if (!flag)
+            if (!response.IsSuccessStatusCode)
             {
                 return Unauthorized();
             }
 
-            Guid customerId = h.getUserId(token);
-
+            Guid customerId = _api.getUserId(token);
+;
             var record = _context.Cart.FirstOrDefault(x => x.CId == customerId);
 
             if (record == null)
@@ -210,11 +182,9 @@ namespace CartMicroservice.Controllers
             var authorizationHeader = Request.Headers["Authorization"].ToString();
             var token = authorizationHeader.Replace("Bearer ", "");
 
-            Helper h = new Helper(_configuration);
+            HttpResponseMessage response = await _api.isAuthorized(token);
 
-            var flag = await h.isAuthorised(token);
-
-            if (!flag)
+            if (!response.IsSuccessStatusCode)
             {
                 return Unauthorized();
             }
@@ -239,11 +209,9 @@ namespace CartMicroservice.Controllers
             var authorizationHeader = Request.Headers["Authorization"].ToString();
             var token = authorizationHeader.Replace("Bearer ", "");
 
-            Helper h = new Helper(_configuration);
+            HttpResponseMessage response = await _api.isAuthorized(token);
 
-            var flag = await h.isAuthorised(token);
-
-            if (!flag)
+            if (!response.IsSuccessStatusCode)
             {
                 return Unauthorized();
             }
